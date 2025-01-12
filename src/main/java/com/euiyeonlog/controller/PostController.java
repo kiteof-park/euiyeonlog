@@ -54,6 +54,11 @@ public class PostController {
         postService.write(request);
     }
 
+    @GetMapping("/posts/{postId}")
+    public Post get(@PathVariable(name = "postId") Long id){
+        Post post = postService.get(id);
+        return post;
+    }
 
     // 📌 글 등록1 - POST Method
     // x-www.form-urlencoded 형태의 데이터를 서버로 요청(@RequestParam을 사용)

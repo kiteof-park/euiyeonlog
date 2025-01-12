@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -38,5 +40,19 @@ public class PostService {
                 .content(postCreate.getContent())
                 .build();
         postRepository.save(post);
+    }
+
+    // 글 조회하는 메서드
+    public Post get(Long id){
+        // 📌 Optional 데이터는 가져와서 즉시 꺼내는걸 추천
+//        Optional<Post> postOptional =postRepository.findById(id);
+//        if(postOptional.isPresent()){
+//            Post post = postOptional.get();
+//        }
+
+        Post post = postRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 글입니다."));
+
+        return post;
     }
 }
