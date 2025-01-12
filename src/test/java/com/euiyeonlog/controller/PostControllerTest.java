@@ -188,6 +188,27 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
                 () -> assertEquals("의연 최공 DB저장 테스트", post.getContent())
         );
     }
+
+    // 📌 글 1개 조회 테스트
+    @Test
+    @DisplayName("글 1개 조회")
+    void test4() throws Exception{
+        // given
+        Post post = Post.builder()
+                .title("컨트롤러 테스트 제목이에옹")
+                .content("컨트롤러 테스트 내용이에옹")
+                .build();
+        postRepository.save(post);
+
+        // expected(when + then)
+        mockMvc.perform(MockMvcRequestBuilders.get("/posts/{postId}", post.getId())
+                .contentType(APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.id").value(post.getId()))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.title").value("컨트롤러 테스트 제목이에옹"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.content").value("컨트롤러 테스트 내용이에옹"))
+                .andDo(MockMvcResultHandlers.print());
+    }
 }
 
 /* 📌 MockMvc
