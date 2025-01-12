@@ -1,16 +1,22 @@
 package com.euiyeonlog.controller;
 
+import com.euiyeonlog.domain.Post;
 import com.euiyeonlog.request.PostCreate;
+import com.euiyeonlog.service.PostService;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 // ✅ 데이터 기반  API응답 생성을 위해 RestController 사용
+// ✅ HttpMessageConverter를 이용해 JSON형태로 응답
 // ✅ RestController = @ResponseBody + @Controller
 @RestController
+@RequiredArgsConstructor
 @Slf4j
 public class PostController {
+    private final PostService postService;
     // SSR -> JSP, Thymeleaf, Mustache, Freemarker
     // SPA ->
         // Vue -> Vue + SSR = nuxt.js
@@ -18,7 +24,6 @@ public class PostController {
     
     // SSR -> 서버에서 렌더링을 해서 데이터를 내려줌(Html Rendering)
     // SPA -> Vue -> Javascript에서 화면을 만들어주고, 서버와의 통신은 API로만 통신, JSON형태로 응답처리
-
 
     // @RequestMapping(method = RequestMethod.GET, path = "/posts" 와 같음
     @GetMapping("/posts")
@@ -30,16 +35,30 @@ public class PostController {
 
     // ✅ HTTP Method : GET, POST, PUT, PATCH, HEAD, OPTIONS, TRACE, CONNECT
 
-    // 📌 글 등록 - @ControllerAdvice, @ExceptionHandler
+    // 📌 글 등록1 - @ControllerAdvice, @ExceptionHandler
+//    @PostMapping("/posts")
+//    public Map<String, String> post(@RequestBody @Valid PostCreate postCreate){
+//         // 레포지토리에 바로 저장 vs 서비스 레이어를 통해 레포지토리를 호출해 저장 ? 서비스 레이어 이용✅
+//        postService.write(postCreate);
+//        return Map.of();
+//    }
+
+    // 📌 글 등록2 - 응답 값 변경
     @PostMapping("/posts")
-    public Map<String, String> post(@RequestBody @Valid PostCreate params){
-        return Map.of();
+    public void post(@RequestBody @Valid PostCreate request){
+        // Case 1. 저장한 데이터 Entity -> Response로 응답하기
+        // Case 2. 저장한 데이터의 Pk id -> Response로 응답하기
+                // 클라이언트에서는 응답받은 id를 조회 API를 통해 데이터를 응답 받음?
+        // Case 3. 응답 필요 없음
+                // 클라이언트에서 모든 글 데이터 Context를 잘 관리함
+        postService.write(request);
     }
+
 
     // 📌 글 등록1 - POST Method
     // x-www.form-urlencoded 형태의 데이터를 서버로 요청(@RequestParam을 사용)
 //    @PostMapping("/posts")
-//    public String post(@RequestParam String title, @RequestParam String content){
+//     public String post(@RequestParam String title, @RequestParam String content){
 ////        System.out.println("title = " + title);
 ////        System.out.println("content = " + content);
 //
@@ -69,7 +88,7 @@ public class PostController {
     // 📌 글 등록4 - POST Method
 //    @PostMapping("/posts")
 //    public Map<String, String> post(@RequestBody @Valid PostCreate params, BindingResult result){
-//        // ✅데이터 검증 필요 -> PostCreate의 @NotBlank로 해결 !!
+//        // ✅데이터 검증 필요 -> PostCreate의 @NotBlank 어노테이션으로 해결!!
 ////        var title = params.getTitle();
 ////        if(title == null || title.equals("")){
 ////            throw new Exception("title값이 없서용!");
