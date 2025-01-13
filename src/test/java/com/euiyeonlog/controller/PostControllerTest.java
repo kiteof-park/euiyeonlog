@@ -1,7 +1,9 @@
 package com.euiyeonlog.controller;
 
 import com.euiyeonlog.domain.Post;
+import com.euiyeonlog.domain.PostEditor;
 import com.euiyeonlog.request.PostCreate;
+import com.euiyeonlog.request.PostEdit;
 import com.euiyeonlog.respository.PostRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -9,9 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers;
@@ -109,7 +109,7 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
                 .contentType(APPLICATION_JSON)
                 .content(json))
                 .andExpect(MockMvcResultMatchers.status().isOk())
-                .andExpect(MockMvcResultMatchers.content().string("{}"))    // 컨트롤러에서 Map.of()를 반환
+                .andExpect(MockMvcResultMatchers.content().string(""))    // 컨트롤러에서 Map.of()를 반환
                 .andDo(MockMvcResultHandlers.print());
     }
 
@@ -195,18 +195,46 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
     void test4() throws Exception{
         // given
         Post post = Post.builder()
-                .title("컨트롤러 테스트 제목이에옹")
+                .title("123456789012345")
                 .content("컨트롤러 테스트 내용이에옹")
                 .build();
         postRepository.save(post);
+
+        // 클라이언트 요구사항
+            // 'JSON 응답에서 title값 길이를 최대 10글자로 해주세요' 라고 한다면?
+            // Post(엔티티)에서 getTitle(){return substring()} 메서드 추가 -> Jackson이 10글자만 가져감
+            // 응답 클래스를 분리
 
         // expected(when + then)
         mockMvc.perform(MockMvcRequestBuilders.get("/posts/{postId}", post.getId())
                 .contentType(APPLICATION_JSON))
                 .andExpect(MockMvcResultMatchers.status().isOk())
                 .andExpect(MockMvcResultMatchers.jsonPath("$.id").value(post.getId()))
-                .andExpect(MockMvcResultMatchers.jsonPath("$.title").value("컨트롤러 테스트 제목이에옹"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.title").value("1234567890"))
                 .andExpect(MockMvcResultMatchers.jsonPath("$.content").value("컨트롤러 테스트 내용이에옹"))
+                .andDo(MockMvcResultHandlers.print());
+    }
+
+    // 📌 글 내용 업데이트 테스트
+    @Test
+    @DisplayName("글 제목 수정")
+    void test7() throws Exception{
+        // given
+        Post post = Post.builder()
+                .title("의연")
+                .content("반포자이")
+                .build();
+        postRepository.save(post);
+
+        PostEdit postEdit = PostEdit.builder()
+                .title("의연")
+                .content("초가집")
+                .build();
+
+        mockMvc.perform(MockMvcRequestBuilders.patch("/posts/{postId}", post.getId())
+                .contentType(APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(postEdit)))
+                .andExpect(MockMvcResultMatchers.status().isOk())
                 .andDo(MockMvcResultHandlers.print());
     }
 }

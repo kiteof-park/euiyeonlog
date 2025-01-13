@@ -2,14 +2,14 @@ package com.euiyeonlog.service;
 
 import com.euiyeonlog.domain.Post;
 import com.euiyeonlog.request.PostCreate;
+import com.euiyeonlog.request.PostEdit;
+import com.euiyeonlog.response.PostResponse;
 import com.euiyeonlog.respository.PostRepository;
-import org.aspectj.lang.annotation.Before;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
@@ -61,15 +61,73 @@ class PostServiceTest {
          postRepository.save(requestPost);
 
         // when
-        Post post = postService.get(requestPost.getId());
+        PostResponse postResponse = postService.get(requestPost.getId());
 
         // then
         assertAll(
-                () -> assertNotNull(post),
+                () -> assertNotNull(postResponse),
                 // ⚠️ test1()에 의해 Test Failed -> @BeforeEach를 활용
                 () -> assertEquals(1L, postRepository.count()),
-                () -> assertEquals("호돌맨 제목 테스트", post.getTitle()),
-                () -> assertEquals("호돌맨 내용 테스트", post.getContent())
+                () -> assertEquals("호돌맨 제목 테스트", postResponse.getTitle()),
+                () -> assertEquals("호돌맨 내용 테스트", postResponse.getContent())
         );
+    }
+
+    // 업데이트 테스트 - 제목 수정
+    @Test
+    @DisplayName("글 제목 수정")
+    void test4(){
+        // given
+        Post post = Post.builder()
+                        .title("의연")
+                        .content("부자될랭")
+                        .build();
+        postRepository.save(post);
+
+        // 수정할 데이터
+        PostEdit postEdit = PostEdit.builder()
+                .title("호돌맨")
+                .content("부자될랭")
+                .build();
+
+        // when
+        postService.edit(post.getId(), postEdit);
+
+        // then
+        Post changedPost = postRepository.findById(post.getId())
+                .orElseThrow(()-> new RuntimeException("글이 존재하지 않습니다. id = " + post.getId()));
+
+        System.out.println(changedPost.getTitle());
+        System.out.println(changedPost.getContent());
+        assertEquals("호돌맨", changedPost.getTitle());
+    }
+
+    // 업데이트 테스트 - 내용 수정
+    @Test
+    @DisplayName("글 내용 수정")
+    void test5(){
+        // given
+        Post post = Post.builder()
+                .title("의연")
+                .content("초가집")
+                .build();
+        postRepository.save(post);
+
+        // 수정할 데이터
+        PostEdit postEdit = PostEdit.builder()
+                .title("호돌맨")
+                .content("반포자이")
+                .build();
+
+        // when
+        postService.edit(post.getId(), postEdit);
+
+        // then
+        Post changedPost = postRepository.findById(post.getId())
+                .orElseThrow(()-> new RuntimeException("글이 존재하지 않습니다. id = " + post.getId()));
+
+        System.out.println(changedPost.getTitle());
+        System.out.println(changedPost.getContent());
+        assertEquals("반포자이", changedPost.getContent());
     }
 }
