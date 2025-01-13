@@ -486,3 +486,271 @@ Person person = objectMapper.readValue(jsonString, Person.class);
 - 값 생성에 대한 유연함 제공
 - 필요한 값만 받을 수 있다
 - 객체의 불변성 _- 가장 중요_
+---
+# 13강 게시글 조회1 - 단건 조회
+
+---
+# 14강 게시글 조회2 - 응답 클래스 분리
+### Request 클래스(`PostCreate`)
+- 요청과 요청에 대한 검증(Validation)할 수 있는 정책을 담아둠
+
+### Response 클래스(`PostResponse`)
+- 서비스 정책에 맞는 로직이 들어갈 수 있는 클래스
+- Post Etity를 바로 JSON을 변환해서 응답❌
+- Entity를 Response 클래스로 변환해서 응답⭕
+
+### Entity가 JSON으로 자동으로 변환되어 응답된다구? 
+Spring Boot에서는 기본적으로 
+  - `@RestController`
+  - `@ResponseBody`
+
+가 적용된 메서드에서 Entity 객체를 반환하면 자동으로 JSON으로 변환되어 응답
+이 과정은 Jackson 라이브러리를 통해 이루어짐!
+
+### Spring Boot에서 JSON 변환 동작 방식
+**1. Repository에서 엔티티를 조회:**
+- repository.findById()를 호출하여 데이터베이스에서 엔티티를 가져옴
+
+**2. 컨트롤러 메서드의 반환 값 처리:**
+- @RestController 또는 @ResponseBody가 붙은 컨트롤러 메서드는 반환된 객체를 HTTP 응답 바디에 매핑
+
+**3. Jackson을 사용한 직렬화:**
+- Spring Boot는 기본적으로 Jackson을 사용하여 반환된 객체를 JSON 형식으로 변환
+- 엔티티의 필드를 읽고 JSON 형식의 응답으로 직렬화
+
+---
+# 15강 게시글 조회3 - 게시글 여러개 조회
+
+---
+# 16강 게시글 조회4 - 페이징 처리
+
+---
+# 17강 게시글 조회5 - 페이징 처리(QueryDSL)
+
+---
+# 18강 게시글 수정
+## 1. 엔티티에 Setter()를 통해 수정
+### (1) 게시물 수정 요청 데이터를 PostEdit(DTO)을 통해 받음
+- 게시물 수정 요청 데이터를 검증하기 위해 `Validation`을 이용
+- 게시물 작성 요청 데이터인 `PostCreate`와 동일
+  - `PostCreate`로 퉁칠까? ❌ _- 빠따 쳐맞는 생각_
+  - 기능이 다르면 코드가 비슷해도 명확한 분리가 필요
+### (2) Post 엔티티에 @Setter를 추가해 setter()를 통한 값 수정
+- Post 엔티티에 @Setter 추가
+- PostEdit으로 게시글 수정 요청 데이터를 받음
+- PostEdit의 값을 꺼내와서(getter) Post 값을 수정(setter)
+
+📂`Post.java`
+```java
+@Entity
+@Getter 
+@Setter
+@NoArgsConstructor(access = AccessLevel.PUBLIC)
+public class Post {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String title;
+    
+    @Lob
+    private String content;
+
+    @Builder
+    public Post(String title, String content) {
+        this.title = title;
+        this.content = content;
+    }
+}
+```
+
+📂`PostEdit.java`
+```java
+@Getter
+@ToString
+public class PostEdit {
+    @NotBlank(message = "title을 입력하세요")
+    private String title;
+
+    @NotBlank(message = "content를 입력하세요")
+    private String content;
+
+    @Builder
+    public PostEdit(String title, String content) {
+        this.title = title;
+        this.content = content;
+    }
+}
+```
+
+📂`PostService.java`
+
+```java
+    public void edit(Long id, PostEdit postEdit){
+        // id를 통해 게시글 하나 가져오기
+        Post post = postRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 글입니다."));
+
+        // 엔티티의 setter()를 이용해 게시글 수정
+        post.setTitle(postEdit.getTitle());
+        post.setContent(postEdit.getContent());
+        
+        postRepository.save(post);
+    }
+```
+
+### ❌ 엔티티에 @Setter 사용 지양 !!❌
+
+---
+
+## 2. 엔티티에  @Setter를 제거하고, 변경 메서드 추가
+📂`Post.java`
+```java
+@Entity
+@Getter
+@NoArgsConstructor(access = AccessLevel.PUBLIC)
+public class Post {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String title;
+    
+    @Lob
+    private String content;
+
+    @Builder
+    public Post(String title, String content) {
+        this.title = title;
+        this.content = content;
+    }
+    
+    // 📌 title, content 변경 메서드 추가
+    public void change(String title, String content) {
+        this.title = title;
+        this.content = content;
+    }
+}
+```
+📂`PostService.java`
+```java
+    @Transactional
+    public void edit(Long id, PostEdit postEdit){
+        // id를 통해 게시글 하나 가져오기
+        Post post = postRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 글입니다."));
+        
+        // 2. 엔티티에 @Setter를 제거하고, 제목과 내용을 변경하는 메서드 추가
+        post.change(postEdit.getTitle(), postEdit.getContent());
+    }
+}
+```
+### ⚠️ change()메서드 매개변수의 순서가 바뀌어서 들어온다면?
+title에 content저장, content에 title이 저장되는 일 발생  
+-> 이런 상황은 버그를 발견하기 굉장이 힘든 문제
+
+### ⚠️ change()메서드 매개변수의 순서가 많아진다면?
+실수할 확률이 높아짐
+
+--- 
+
+## 3. 엔티티에 change() 메서드를 제거하고 빌더 클래스 이용
+### (1) 클라이언트가 PATCH /posts/{postdId}로 요청을 보냄
+### (2) PostEdit 객체로 데이터를 전달받아 검증
+### (3) `edit` 서비스 메서드에서
+1. 해당 id로 `Post` 엔티티를 조회
+2. 엔티티에서 `PostEditorBuilder`를 생성
+3. 필요한 값만 수정 후 `PostEditor`를 빌드
+4. 엔티티의 `edit` 메서드를 호출해 값을 변경
+
+📂`PostEditor.java`
+- `PostEditor`는 수정할 수 있는 필드들에 대해서만 정의
+```java
+@Getter
+public class PostEditor {
+    private final String title;
+    private final String content;
+
+    @Builder
+    public PostEditor(String title, String content) {
+        this.title = title;
+        this.content = content;
+    }
+}
+```
+
+📂`Post.java` 
+```java
+@Entity
+@Getter
+@NoArgsConstructor(access = AccessLevel.PUBLIC)
+public class Post {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String title;
+
+    // @Lob : 자바에서는 String, DB에서는 Long text형태로 되도록 함
+    @Lob
+    private String content;
+
+    @Builder
+    public Post(String title, String content) {
+        this.title = title;
+        this.content = content;
+    }
+    
+    // 📌 빌드하지 않은 빌더 클래스 자체를 반환 - 픽스되지 않은 데이터
+    // 📌 현재 이 Post 엔티티가 가지고 있는 값을 그대로 복사해서 넘겨줌
+    public PostEditor.PostEditorBuilder toEditor(){
+        return PostEditor.builder()
+                .title(title)
+                .content(content);
+    }
+
+    // 📌 값이 픽스된 PostEditor가 넘어옴
+    // ✅ 1. PostEditor 딱 한개만 인자로 받는 메서드로 개선 가능
+    // ✅ 2. PostEditor내에 수정 가능한 필드만 좁혀서 선언 가능
+    public void edit(PostEditor postEditor){
+        this.title = postEditor.getTitle();
+        this.content = postEditor.getContent();
+    }
+}
+```
+
+📂`PostService.java`
+```java
+    @Transactional
+    public void edit(Long id, PostEdit postEdit){
+        // id를 통해 게시글 하나 가져오기
+        Post post = postRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 글입니다."));
+        
+        // 📌 PostEditor와 빌드되지 않은 빌더 클래스를 이용
+        PostEditor.PostEditorBuilder postEditorBuilder = post.toEditor();
+        
+        PostEditor postEditor = postEditorBuilder.title(postEdit.getTitle())
+                .content(postEdit.getContent())
+                .build(); // 📌값을 변경하고 빌드 (값을 픽스시킴)
+
+        post.edit(postEditor);
+    }
+```
+
+## 💡생각해볼 거리
+- 엔티티에 수정 가능한 필드가 여러 개 있는데, 그 중에서도 일부만 수정한다면?
+- 수정하지 않은 수정 가능한 필드는 원래의 값을 유지해야 하는데 어떻게 유지함?
+
+---
+# 19강 게시글 수정(오류 수정, 보충 내용)
+
+---
+# 20강 게시글 삭제
+
+---
+# 21강 예외처리1
+
+---
+# 22강 예외처리2
+
