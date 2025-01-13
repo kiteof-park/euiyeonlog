@@ -2,6 +2,8 @@ package com.euiyeonlog.controller;
 
 import com.euiyeonlog.domain.Post;
 import com.euiyeonlog.request.PostCreate;
+import com.euiyeonlog.request.PostEdit;
+import com.euiyeonlog.response.PostResponse;
 import com.euiyeonlog.service.PostService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -53,11 +55,28 @@ public class PostController {
                 // 클라이언트에서 모든 글 데이터 Context를 잘 관리함
         postService.write(request);
     }
-
+    
+    // 📌 글 조회 - 게시글 1개 조회
     @GetMapping("/posts/{postId}")
-    public Post get(@PathVariable(name = "postId") Long id){
-        Post post = postService.get(id);
-        return post;
+    public PostResponse get(@PathVariable(name = "postId") Long id){
+        PostResponse postResponse = postService.get(id);
+        return postResponse;
+
+        // 클라이언트에게 title이 10글자만 내려가도록 함
+        // ✅ 서비스를 위한 응답 클래스를 분리 -> ResponseDTO
+    }
+
+    // 📌 글 수정
+    @PatchMapping("/posts/{postId}")
+    public void edit(@PathVariable Long postId, @RequestBody @Valid PostEdit request){
+        postService.edit(postId, request);
+    }
+
+//    @GetMapping("/posts/{postId}/rss")
+//    public Post getRss(@PathVariable(name = "postId") Long id){
+//        Post post = postService.getRss(id);
+//        return post;
+        // title의 전체를 요구 -> get()메서드와 정책이 충돌됨(?)
     }
 
     // 📌 글 등록1 - POST Method
@@ -128,7 +147,7 @@ public class PostController {
 //        log.info("title={}, content={}", request.getTitle(), request.getContent());
 //        return "안뇽💖";
 //    }
-}
+
 
 // 📌 글 등록4를 위한 클래스 - DTO 역할
 // 📌 @RequestBody는 JSON 데이터를 DTO 객체에 매핑

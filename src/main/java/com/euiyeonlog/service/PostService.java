@@ -1,11 +1,15 @@
 package com.euiyeonlog.service;
 
 import com.euiyeonlog.domain.Post;
+import com.euiyeonlog.domain.PostEditor;
 import com.euiyeonlog.request.PostCreate;
+import com.euiyeonlog.request.PostEdit;
+import com.euiyeonlog.response.PostResponse;
 import com.euiyeonlog.respository.PostRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
@@ -43,7 +47,7 @@ public class PostService {
     }
 
     // 글 조회하는 메서드
-    public Post get(Long id){
+    public PostResponse get(Long id){
         // 📌 Optional 데이터는 가져와서 즉시 꺼내는걸 추천
 //        Optional<Post> postOptional =postRepository.findById(id);
 //        if(postOptional.isPresent()){
@@ -53,6 +57,60 @@ public class PostService {
         Post post = postRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 글입니다."));
 
-        return post;
+        // 📌 조회해온 엔티티를 변환 -> 이 변환 작업을 서비스 레이어에서 하는게 맞을까?
+        /* 서비스 레이어를 웹 서비스, 서비스로 나눠서 생각해보기
+        *  Post Controller -> WebPostSerivce -> Repostiory
+        *                  -> PostService
+        *  ✅ WebPostSerivce : Response를 위해서 행위를 하는 서비스 호출을 담당
+        *  ✅ PostService : 외부 연동을 하는 서비스와 통신하는 서비스를 담당
+        * */
+        PostResponse response = PostResponse.builder()
+                .id(post.getId())
+                .title(post.getTitle())
+                .content(post.getContent())
+                .build();
+        return response;
+    }
+
+//    public Post getRss(Long id){
+//        Post post = postRepository.findById(id)
+//                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 글입니다."));
+//        return post;
+//    }
+
+    // 게시글 수정 - 수정해야 할 게시글 식별번호(pk)와 수정할 내용(PostEdit) 필요
+    @Transactional
+    public void edit(Long id, PostEdit postEdit){
+        // id를 통해 게시글 하나 가져오기
+        Post post = postRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 글입니다."));
+
+        // 1. 제목, 내용 변경 -> ❌엔티티에 @Setter달아서 수정하기? 지양!!❌
+//        post.setTitle(postEdit.getTitle());
+//        post.setContent(postEdit.getContent());
+        
+        // 2. 엔티티에 @Setter를 제거하고, 제목과 내용을 변경하는 메서드 추가
+        // post.change(postEdit.getTitle(), postEdit.getContent());
+        
+        // 3. PostEditor와 빌드되지 않은 빌더 클래스를 이용
+        PostEditor.PostEditorBuilder postEditorBuilder = post.toEditor();
+
+        // 이거 뭐지
+//        if (postEdit.getTitle() != null){
+//            postEditorBuilder.title(postEdit.getTitle());
+//        }
+//        if (postEdit.getContent() != null){
+//            postEditorBuilder.content(postEdit.getContent());
+//        }
+//        post.edit(postEditorBuilder.build());
+
+        PostEditor postEditor = postEditorBuilder.title(postEdit.getTitle())
+                .content(postEdit.getContent())
+                .build();// 값을 변경하고 빌드 (값을 픽스시킴)
+
+        post.edit(postEditor);
+
+        // 레포지토리 save -> @Transactioonal로 대체
+        // postRepository.save(post);
     }
 }
