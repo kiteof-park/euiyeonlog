@@ -737,13 +737,238 @@ public class Post {
         post.edit(postEditor);
     }
 ```
+--- 
 
 ## 💡생각해볼 거리
 - 엔티티에 수정 가능한 필드가 여러 개 있는데, 그 중에서도 일부만 수정한다면?
 - 수정하지 않은 수정 가능한 필드는 원래의 값을 유지해야 하는데 어떻게 유지함?
+- 만약 클라이언트에서 수정하지 않은 필드에 `null`값을 보내준다면?
+
+📂`PostService.java`
+```java
+post.edit(
+        postEdit.getTitle() != null ? postEdit.getTitle() : post.getTitle(),
+        postEdit.getContent() != null ? postEdit.getContent() : post.getContent() 
+        );
+```
+-> 근데 이런짓을 하기 싫어서 `PostEditor`를 사용
 
 ---
 # 19강 게시글 수정(오류 수정, 보충 내용)
+## 기존의 게시글 수정 방식
+- 저장되어 있는 게시글(`Post`)을 레포지토리에서 조회
+- 요청받은 데이터(`PostEdit`)를 덮어씌우기(`PostEditor`)해서 저장
+
+## 새로운 게시글 수정 방식 
+- `PostEditor` 사용❌
+
+  📂`Post.java`
+```java
+@Entity
+@Getter
+@NoArgsConstructor(access = AccessLevel.PUBLIC)
+public class Post {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String title;
+
+    // @Lob : 자바에서는 String, DB에서는 Long text형태로 되도록 함
+    @Lob
+    private String content;
+
+    @Builder
+    public Post(String title, String content) {
+        this.title = title;
+        this.content = content;
+    }
+    public void edit(String title, String content){
+        this.title = title;
+        this.content = content;
+    }
+}
+```
+📂`PostService.java`
+```java
+    // 게시글 수정 - 수정해야 할 게시글 식별번호(pk)와 수정할 내용(PostEdit) 필요
+    @Transactional
+    public void edit(Long id, PostEdit postEdit){
+        // id를 통해 게시글 하나 가져오기
+        Post post = postRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 글입니다."));
+        
+        post.edit(postEdit.getTitle(), postEdit.getContent());
+    }
+}
+```
+
+
+## 왜 PostEditor를 사용해야할까?
+- `Post`와 `PostEdit`의 필드가 무수히 늘어나게 된다면?
+
+📂`PostService.java`
+```java
+    @Transactional
+public void edit(Long id, PostEdit postEdit){
+    
+        Post post = postRepository.findById(id)
+        .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 글입니다."));
+
+        // 💡 edit() 메서드에 전달해야되는 매개변수도 무수히 늘어나면 곤란하지 않을까?
+        post.edit(postEdit.getTitle(), postEdit.getContent(), ........ , );
+        }
+```
+-> `Post`엔티티 자체에 대해 수정할 수 있는 필드의 범위를 좁히는 것이 중요하지 않을까?  
+-> `Post`엔티티에서 수정할 수 있는 제한 범위를 두기 위해 `PostEditor`를 사용
+
+### @Builder의 .build()는 어떻게 작동할까?
+`.build()`를 하는 순간 @` Builder` 어노테이션이 달린 생성자 호출?
+~~몬말임 ...~~
+
+
+- 기존에 `Post`에 저장된 데이터를 `PostEditorBuilder`를 통해 가져옴  
+이때 `.build()`를 호출하지 않음
+- ⚠️`.build()`를 호출하지 않으면 `PostEditor`의  생성자가 호출되지 않음
+  - 그래서 `PostEditor`가 아닌 `PostEditorBuilder`가 반환됨
+
+📂`Post.java`
+```java
+    public PostEditor.PostEditorBuilder toEditor(){
+        return PostEditor.builder()
+                .title(title)
+                .content(content);
+    }
+```
+📂`PostEditior.java`
+```java
+@Getter
+public class PostEditor {
+    private final String title;
+    private final String content;
+    
+    @Builder
+    public PostEditor(String title, String content) {
+        this.title = title;
+        this.content = content;
+    }
+}
+
+```
+
+그리고 서비스에서 title과 content를 덮어씌우고 빌드를 함
+
+📂`PostService.java`
+```java
+        PostEditor postEditor = postEditorBuilder.title(postEdit.getTitle())
+                .content(postEdit.getContent())
+                .build();// 값을 변경하고 빌드 (값을 픽스시킴)
+```
+## 그.런.데
+- `null`값 체크는 `PostEditor`가 아니라 `PostEditorBuilder`인 빌더클래스에서 체크  
+- `null`값은 `PostEdito`r 생성자가 아니라 빌더 클래스에 들어감
+- 그래서 `if` 조건문을 안타게됨  
+- 그리고 `PostEditor`의 기본값 `null`이 들어가짐   
+
+📂`PostEditor.java`
+```java
+@Getter
+public class PostEditor {
+
+    private String title;
+    private String content;
+
+    @Builder
+    public PostEditor(String title, String content) {
+        // ❌이 짓거리가 의미없다구 !!❌
+        if (title != null) {
+            this.title = title;
+        }
+        if (content != null) {
+            this.content = content;
+        }
+    }
+}
+```
+어쨋든 빌더 녀석은 `PostEditor`가 아니라 `PostEditorBuilder`에서 들어가므로  
+`PostEditor`에서 `null`값 체크를 하는건 의미가 없음❗❗❌
+
+## 정리
+## 🪄 null값 체크는 PostEditor가 아닌 PostEditBuilder에서 해야된다!
+
+
+## 해결방법
+1. Builder 클래스를 수동으로 따로 만들어주는게 좋음
+- `build` 패키지에서 PostEditor 내부에 빌드된 Builder클래스랑 메서드를 쌔벼옴
+  - `Lombok`이 생성해준 Builder클래스
+2. Builder 클래스에 값이 들어갈 때 `null` 체크를 하도록 수정
+- PostEditorBuilder에서 조건을 걸어줌
+
+📂`PostEditor.java`
+```java
+@Getter
+public class PostEditor {
+    private String title;
+    private String content;
+    
+    public PostEditor(String title, String content) {
+        this.title = title;
+        this.content = content;
+    }
+
+    public static PostEditor.PostEditorBuilder builder() {
+        return new PostEditorBuilder();
+    }
+
+    public static class PostEditorBuilder {
+
+        private String title;
+        private String content;
+        
+        PostEditorBuilder() {
+        }
+        
+        // 📍title - null값 체크
+        public PostEditorBuilder title(final String title) {
+            if (title != null){
+                this.title = title;   
+            }
+            return this;
+        }
+        
+        // 📍content - null값 체크
+        public PostEditorBuilder content(final String content) {
+            if (content != null){
+                this.content = content;   
+            }
+            return this;
+        }
+
+        public PostEditor build() {
+            return new PostEditor(this.title, this.content);
+        }
+
+        public String toString() {
+            return "PostEditor.PostEditorBuilder(title=" + this.title + ", content=" + this.content + ")";
+        }
+    }
+}
+```
+
+### 근데 public PostEditorBuilder title(final String title) {..} 이거 뭐임?
+### 매개변수의 final
+- 매개변수에 `final`을 사용하면 해당 매개변수의 참조를 메서드 내에서 변경할 수 없도록 제한
+- 단, `final`매개변수가 참조하는 객체의 내부 상태(객체 필드)는 변경 가능
+```java
+public PostEditorBuilder title(final String title) {
+    if (title != null) {
+        this.title = title;
+    }
+    return this;
+}
+```
+- 매개변수 `title`은 메서드 내부에서 변경❌
+- `this.title`은 클래스의 필드, 메서드 매개변수로 전달된 `title`의 값을 받아 설정
 
 ---
 # 20강 게시글 삭제
