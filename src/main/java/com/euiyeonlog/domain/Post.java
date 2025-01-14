@@ -34,6 +34,7 @@ public class Post {
 //        this.content = content;
 //    }
 
+    // 📍  PostEditor를 이용한 게시글 수정(1)
     // 📌 빌드하지 않은 빌더 클래스 자체를 반환
     // 📌 엔티티의 값을 그대로 복사해서 빌더 클래스로 반환
     public PostEditor.PostEditorBuilder toEditor(){
@@ -42,6 +43,7 @@ public class Post {
                 .content(content);
     }
 
+    // 📍  PostEditor를 이용한 게시글 수정(2)
     // 📌 값이 픽스된 PostEditor가 넘어옴
     // 1. PostEditor 딱 한개만 인자로 받는 메서드로 개선 가능
     // 2. PostEditor내에 수정 가능한 필드만 좁혀서 선언 가능
@@ -49,4 +51,10 @@ public class Post {
         this.title = postEditor.getTitle();
         this.content = postEditor.getContent();
     }
+
+    // 📍 2. PostEditor를 사용하지 않고 업데이트 기능 구현
+//    public void edit(String title, String content){
+//        this.title = title;
+//        this.content = content;
+//    }
 }
