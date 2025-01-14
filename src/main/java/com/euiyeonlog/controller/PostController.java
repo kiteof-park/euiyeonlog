@@ -72,6 +72,12 @@ public class PostController {
         postService.edit(postId, request);
     }
 
+    // 📌 글 삭제
+    @DeleteMapping("/posts/{postsId}")
+    public void delete(@PathVariable Long postsId){
+        postService.delete(postsId);
+    }
+
 //    @GetMapping("/posts/{postId}/rss")
 //    public Post getRss(@PathVariable(name = "postId") Long id){
 //        Post post = postService.getRss(id);

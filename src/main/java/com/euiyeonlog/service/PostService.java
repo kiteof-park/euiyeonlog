@@ -91,8 +91,9 @@ public class PostService {
         
         // 2. 엔티티에 @Setter를 제거하고, 제목과 내용을 변경하는 메서드 추가
         // post.change(postEdit.getTitle(), postEdit.getContent());
-        
-        // 3. PostEditor와 빌드되지 않은 빌더 클래스를 이용
+
+        // 📍 PostEdtior를 사용한 게시글 수정(1)
+        //  3. PostEditor와 빌드되지 않은 빌더 클래스를 이용
         PostEditor.PostEditorBuilder postEditorBuilder = post.toEditor();
 
         // 이거 뭐지
@@ -104,13 +105,27 @@ public class PostService {
 //        }
 //        post.edit(postEditorBuilder.build());
 
+        // 📍 PostEdtior를 사용한 게시글 수정(2)
         PostEditor postEditor = postEditorBuilder.title(postEdit.getTitle())
                 .content(postEdit.getContent())
                 .build();// 값을 변경하고 빌드 (값을 픽스시킴)
 
         post.edit(postEditor);
 
+        // 📍 PostEdtior를 사용하지 않고 게시글 수정
+        // post.edit(postEdit.getTitle(), postEdit.getContent());
+
         // 레포지토리 save -> @Transactioonal로 대체
         // postRepository.save(post);
+    }
+
+    public void delete(Long id){
+        // id로 게시글 조회
+        Post post = postRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 글입니다."));
+
+        postRepository.deleteById(id);
+        // 또는
+        // postRepository.delete(post);
     }
 }
