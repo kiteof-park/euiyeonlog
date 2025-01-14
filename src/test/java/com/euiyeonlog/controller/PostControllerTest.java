@@ -237,6 +237,24 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
                 .andExpect(MockMvcResultMatchers.status().isOk())
                 .andDo(MockMvcResultHandlers.print());
     }
+
+    // 📌 게시글 삭제 테스트
+    @Test
+    @DisplayName("게시글 삭제")
+    void test8() throws Exception{
+        // given
+        Post post = Post.builder()
+                .title("의연 짱짱")
+                .content("의연 최고 짱짱")
+                .build();
+        postRepository.save(post);
+
+        // expected
+        mockMvc.perform(MockMvcRequestBuilders.delete("/posts/{postsId}", post.getId())
+                .contentType(APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andDo(MockMvcResultHandlers.print());
+    }
 }
 
 /* 📌 MockMvc

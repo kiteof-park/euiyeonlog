@@ -73,7 +73,7 @@ class PostServiceTest {
         );
     }
 
-    // 업데이트 테스트 - 제목 수정
+    // 업데이트 테스트 - 제목 수정 테스트
     @Test
     @DisplayName("글 제목 수정")
     void test4(){
@@ -102,7 +102,7 @@ class PostServiceTest {
         assertEquals("호돌맨", changedPost.getTitle());
     }
 
-    // 업데이트 테스트 - 내용 수정
+    // 업데이트 테스트 - 내용 수정 테스트
     @Test
     @DisplayName("글 내용 수정")
     void test5(){
@@ -129,5 +129,54 @@ class PostServiceTest {
         System.out.println(changedPost.getTitle());
         System.out.println(changedPost.getContent());
         assertEquals("반포자이", changedPost.getContent());
+    }
+
+
+    // 업데이트 테스트 - 수정이 필요하지 않은 필드에 null이 들어온다면?
+    @Test
+    @DisplayName("글 내용 수정")
+    void test10(){
+        // given
+        Post post = Post.builder()
+                .title("의연")
+                .content("초가집")
+                .build();
+        postRepository.save(post);
+
+        // 수정할 데이터
+        PostEdit postEdit = PostEdit.builder()
+                .title(null)
+                .content("반포자이")
+                .build();
+
+        // when
+        postService.edit(post.getId(), postEdit);
+
+        // then
+        Post changedPost = postRepository.findById(post.getId())
+                .orElseThrow(()-> new RuntimeException("글이 존재하지 않습니다. id = " + post.getId()));
+
+        System.out.println(changedPost.getTitle());
+        System.out.println(changedPost.getContent());
+        assertEquals("의연", changedPost.getTitle());
+        assertEquals("반포자이", changedPost.getContent());
+    }
+
+    @Test
+    @DisplayName("게시글 삭제")
+    void test11(){
+        // given - 게시글 등록
+        Post post = Post.builder()
+                .title("의연 최고")
+                .content("의연 최고 짱짱")
+                .build();
+        postRepository.save(post);
+
+        // when -  게시글 삭제
+        postService.delete(post.getId());
+
+        //then - 레포지토리 게시글 개수 확인
+        assertEquals(0, postRepository.count());
+
     }
 }
