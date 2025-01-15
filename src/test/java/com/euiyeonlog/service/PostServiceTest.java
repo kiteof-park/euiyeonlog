@@ -10,6 +10,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
@@ -48,7 +51,7 @@ class PostServiceTest {
         );
     }
     
-    // 조회 테스트 -> 우선 글을 먼저 저장해주는 작업이 필요
+    // 단건 조회 테스트 -> 우선 글을 먼저 저장해주는 작업이 필요
     @Test
     @DisplayName("글 1개 조회")
     void test2(){
@@ -71,6 +74,65 @@ class PostServiceTest {
                 () -> assertEquals("호돌맨 제목 테스트", postResponse.getTitle()),
                 () -> assertEquals("호돌맨 내용 테스트", postResponse.getContent())
         );
+    }
+
+    // 전체 조회 테스트 -> 우선 글을 먼저 저장해주는 작업이 필요
+    @Test
+    @DisplayName("글 1개 조회")
+    void test3(){
+//        List<Post> posts = new ArrayList<>();
+//
+//        // given
+//        Post requestPost1 = Post.builder()
+//                .title("의연 제목 테스트")
+//                .content("의연 내용 테스트")
+//                .build();
+//
+//        Post requestPost2 = Post.builder()
+//                .title("한얼 제목 테스트")
+//                .content("한얼 내용 테스트")
+//                .build();
+//
+//        Post requestPost3 = Post.builder()
+//                .title("소윤 제목 테스트")
+//                .content("소윤 내용 테스트")
+//                .build();
+//
+//        Post requestPost4 = Post.builder()
+//                .title("진호 제목 테스트")
+//                .content("진호 내용 테스트")
+//                .build();
+//
+//        Post requestPost5 = Post.builder()
+//                .title("병중 제목 테스트")
+//                .content("병중 내용 테스트")
+//                .build();
+//
+//        posts.add(requestPost1);    posts.add(requestPost2);    posts.add(requestPost3);
+//        posts.add(requestPost4);    posts.add(requestPost5);
+//
+//        postRepository.saveAll(posts);
+
+
+        // ♻️ 테스트 코드 리팩토링
+        postRepository.saveAll(List.of(
+                Post.builder()
+                        .title("의연 제목1")
+                        .content("의연 내용1")
+                        .build(),
+                Post.builder()
+                        .title("한얼 제목1")
+                        .content("한얼 제목2")
+                        .build()
+        ));
+
+        // when
+        List<PostResponse> postResponses = postService.getAll();
+
+        // then
+//        assertAll();
+        assertEquals(2, postResponses.size());
+
     }
 
     // 업데이트 테스트 - 제목 수정 테스트
@@ -161,7 +223,8 @@ class PostServiceTest {
         assertEquals("의연", changedPost.getTitle());
         assertEquals("반포자이", changedPost.getContent());
     }
-
+    
+    // 삭제 테스트
     @Test
     @DisplayName("게시글 삭제")
     void test11(){

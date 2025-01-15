@@ -1,11 +1,11 @@
 package com.euiyeonlog.controller;
 
 import com.euiyeonlog.domain.Post;
-import com.euiyeonlog.domain.PostEditor;
 import com.euiyeonlog.request.PostCreate;
 import com.euiyeonlog.request.PostEdit;
 import com.euiyeonlog.respository.PostRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,16 +47,16 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
         postRepository.deleteAll();
     }
 
-    @Test
-    @DisplayName("/posts로 GET 요청 시 Hello World를 출력")
-    void getTest() throws Exception {
-        // expected
-        mockMvc.perform(MockMvcRequestBuilders.get("/posts"))
-                .andExpect(MockMvcResultMatchers.status().isOk())
-                .andExpect(MockMvcResultMatchers.content().string("Hello World"))
-                //  📌 테스트에 대한 요청 summary를 출력
-                .andDo(MockMvcResultHandlers.print());
-    }
+//    @Test
+//    @DisplayName("/posts로 GET 요청 시 Hello World를 출력")
+//    void getTest() throws Exception {
+//        // expected
+//        mockMvc.perform(MockMvcRequestBuilders.get("/euiyeonlog/posts"))
+//                .andExpect(MockMvcResultMatchers.status().isOk())
+//                .andExpect(MockMvcResultMatchers.content().string("Hello World"))
+//                //  📌 테스트에 대한 요청 summary를 출력
+//                .andDo(MockMvcResultHandlers.print());
+//    }
 
     // 📌 JSON 데이터 형식
     @Test
@@ -71,7 +71,8 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
         String json = objectMapper.writeValueAsString(request);
         
         // ⌨️ static 메서드 import : alt + enter
-        mockMvc.perform(MockMvcRequestBuilders.post("/posts")
+        // mockMvc.perform().content() : .content()는 요청 본문(RequestBody)에 데이터를 담기 위해 사용하는 메서드
+        mockMvc.perform(MockMvcRequestBuilders.post("/euiyeonlog/posts")
                         .contentType(APPLICATION_JSON)
                         // .content("{\"title\" : \"제목입니다\", \"content\" : \"내용입니다\"}")
                         .content(json)
@@ -105,7 +106,7 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
         System.out.println(json);
 
         // expected
-        mockMvc.perform(MockMvcRequestBuilders.post("/posts")
+        mockMvc.perform(MockMvcRequestBuilders.post("/euiyeonlog/posts")
                 .contentType(APPLICATION_JSON)
                 .content(json))
                 .andExpect(MockMvcResultMatchers.status().isOk())
@@ -141,7 +142,7 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
         String json = objectMapper.writeValueAsString(request);
 
         // expected
-        mockMvc.perform(MockMvcRequestBuilders.post("/posts")
+        mockMvc.perform(MockMvcRequestBuilders.post("/euiyeonlog/posts")
                         .contentType(APPLICATION_JSON)
                         //.content("{\"title\" : \"\", \"content\" : \"내용입니다\"}")
                         //.content("{\"title\" : null, \"content\" : \"내용입니다\"}") // ✅ @NotBlank는 null도 잡음
@@ -173,7 +174,7 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
         String json = objectMapper.writeValueAsString(request);
 
         // when
-        mockMvc.perform(MockMvcRequestBuilders.post("/posts")
+        mockMvc.perform(MockMvcRequestBuilders.post("/euiyeonlog/posts")
                 .contentType(APPLICATION_JSON)
                 .content(json))
                 .andExpect(MockMvcResultMatchers.status().isOk())
@@ -206,12 +207,89 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
             // 응답 클래스를 분리
 
         // expected(when + then)
-        mockMvc.perform(MockMvcRequestBuilders.get("/posts/{postId}", post.getId())
+        mockMvc.perform(MockMvcRequestBuilders.get("/euiyeonlog/posts/{postId}", post.getId())
                 .contentType(APPLICATION_JSON))
                 .andExpect(MockMvcResultMatchers.status().isOk())
                 .andExpect(MockMvcResultMatchers.jsonPath("$.id").value(post.getId()))
                 .andExpect(MockMvcResultMatchers.jsonPath("$.title").value("1234567890"))
                 .andExpect(MockMvcResultMatchers.jsonPath("$.content").value("컨트롤러 테스트 내용이에옹"))
+                .andDo(MockMvcResultHandlers.print());
+    }
+
+    // 📌 글 전체 조회 테스트
+    @Test
+    @DisplayName("글 전체조회")
+    void test9() throws Exception{
+        // given
+//        List<Post> posts = new ArrayList<>();
+//
+//        Post post1 = Post.builder()
+//                .title("의연 제목")
+//                .content("의연 내용")
+//                .build();
+//
+//        Post post2 = Post.builder()
+//                .title("한얼 제목")
+//                .content("한얼 내용")
+//                .build();
+//
+//        Post post3 = Post.builder()
+//                .title("소윤 제목")
+//                .content("소윤 내용")
+//                .build();
+//
+//        Post post4 = Post.builder()
+//                .title("진호 제목")
+//                .content("진호 내용")
+//                .build();
+//
+//        Post post5 = Post.builder()
+//                .title("병중 제목")
+//                .content("병중 내용")
+//                .build();
+//
+//        posts.add(post1);   posts.add(post2);   posts.add(post3);   posts.add(post4);   posts.add(post5);
+//        postRepository.saveAll(posts);
+
+        // ♻️ 테스트 코드 리팩토링
+        Post post1 = postRepository.save(Post.builder()
+                .title("의연 제목1")
+                .content("의연 내용1")
+                .build());
+
+        Post post2 = postRepository.save(Post.builder()
+                .title("의연 제목2")
+                .content("의연 내용2")
+                .build());
+
+        // expected
+        mockMvc.perform(MockMvcRequestBuilders.get("/euiyeonlog/posts")
+                .contentType(APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                /* 📌 단건 조회인 경우 Json Obejct가 응답으로 왔었음
+                    {"id" : "1","title" : "어쩌구" ...}
+
+                    📌 전체 조회인 경우 리스트 형식으로 응답이 내려옴
+                     [{...}, {...}, {...}]
+                 */
+
+                /*  📌 실제 응답
+                        Body = [
+                        {"id":1,"title":"의연 제목","content":"의연 내용"},
+                        {"id":2,"title":"한얼 제목","content":"한얼 내용"},
+                        {"id":3,"title":"소윤 제목","content":"소윤 내용"},
+                        {"id":4,"title":"진호 제목","content":"진호 내용"},
+                        {"id":5,"title":"병중 제목","content":"병중 내용"}
+                        ]
+                */
+
+                // 📌 검증 포인트 - json 응답 리스트의 길이, json 응답 객체의 값(title, content 등)
+                .andExpect(MockMvcResultMatchers.jsonPath("$.length()", Matchers.is(2)))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0].id").value(post1.getId()))
+//                .andExpect(MockMvcResultMatchers.jsonPath("$[0].title").value(post1.getTitle()))
+//                .andExpect(MockMvcResultMatchers.jsonPath("$[0].content").value(post1.getContent()))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0].title").value("의연 제목1"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0].content").value("의연 내용1"))
                 .andDo(MockMvcResultHandlers.print());
     }
 
@@ -231,7 +309,7 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
                 .content("초가집")
                 .build();
 
-        mockMvc.perform(MockMvcRequestBuilders.patch("/posts/{postId}", post.getId())
+        mockMvc.perform(MockMvcRequestBuilders.patch("/euiyeonlog/posts/{postId}", post.getId())
                 .contentType(APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(postEdit)))
                 .andExpect(MockMvcResultMatchers.status().isOk())
@@ -250,7 +328,7 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
         postRepository.save(post);
 
         // expected
-        mockMvc.perform(MockMvcRequestBuilders.delete("/posts/{postsId}", post.getId())
+        mockMvc.perform(MockMvcRequestBuilders.delete("/euiyeonlog/posts/{postsId}", post.getId())
                 .contentType(APPLICATION_JSON))
                 .andExpect(MockMvcResultMatchers.status().isOk())
                 .andDo(MockMvcResultHandlers.print());
