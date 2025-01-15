@@ -11,7 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Optional;
+import java.util.List;
 
 @Service
 @Slf4j
@@ -46,7 +46,7 @@ public class PostService {
         postRepository.save(post);
     }
 
-    // 글 조회하는 메서드
+    // 글 조회 메서드 - 단건 조회
     public PostResponse get(Long id){
         // 📌 Optional 데이터는 가져와서 즉시 꺼내는걸 추천
 //        Optional<Post> postOptional =postRepository.findById(id);
@@ -71,6 +71,35 @@ public class PostService {
                 .build();
         return response;
     }
+
+    // 글 조회 메서드 - 전체 조회
+//    public List<PostResponse> getAll(){
+//        List<Post> posts = postRepository.findAll();
+//
+//        // Post를 PostResponse로 변환하는 작업이 필요
+//        List<PostResponse> postResponses = posts.stream()
+//                .map(post -> PostResponse.builder()
+//                        .id(post.getId())
+//                        .title(post.getTitle())
+//                        .content(post.getContent())
+//                        .build())
+//                .toList();
+//        return postResponses;
+//    }
+    
+    // ♻️ [리팩토링] 글 조회 메서드 - 전체조회
+    // 반복적으로 작업하는 빌더 코드가 너무 많음
+    // PostReponse에서 생성자 오버로딩을 통해 매개변수로 Post를 받음
+    public List<PostResponse> getAll(){
+        List<Post> posts = postRepository.findAll();
+
+        List<PostResponse> postResponses = posts.stream()
+                .map(post -> new PostResponse(post))
+                // .map(PostResponse::new)
+                .toList();
+        return postResponses;
+    }
+
 
 //    public Post getRss(Long id){
 //        Post post = postRepository.findById(id)
@@ -119,6 +148,7 @@ public class PostService {
         // postRepository.save(post);
     }
 
+    // 글 삭제 메서드
     public void delete(Long id){
         // id로 게시글 조회
         Post post = postRepository.findById(id)

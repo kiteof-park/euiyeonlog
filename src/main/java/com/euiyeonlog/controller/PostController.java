@@ -1,6 +1,5 @@
 package com.euiyeonlog.controller;
 
-import com.euiyeonlog.domain.Post;
 import com.euiyeonlog.request.PostCreate;
 import com.euiyeonlog.request.PostEdit;
 import com.euiyeonlog.response.PostResponse;
@@ -9,30 +8,32 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
-import java.util.Map;
+
+import java.util.List;
 
 // ✅ 데이터 기반  API응답 생성을 위해 RestController 사용
 // ✅ HttpMessageConverter를 이용해 JSON형태로 응답
 // ✅ RestController = @ResponseBody + @Controller
+@Slf4j
 @RestController
 @RequiredArgsConstructor
-@Slf4j
+@RequestMapping("/euiyeonlog")
 public class PostController {
     private final PostService postService;
     // SSR -> JSP, Thymeleaf, Mustache, Freemarker
     // SPA ->
-        // Vue -> Vue + SSR = nuxt.js
-        // React -> React + SSR = next.js
-    
+    // Vue -> Vue + SSR = nuxt.js
+    // React -> React + SSR = next.js
+
     // SSR -> 서버에서 렌더링을 해서 데이터를 내려줌(Html Rendering)
     // SPA -> Vue -> Javascript에서 화면을 만들어주고, 서버와의 통신은 API로만 통신, JSON형태로 응답처리
 
     // @RequestMapping(method = RequestMethod.GET, path = "/posts" 와 같음
-    @GetMapping("/posts")
-    public String get(){
-        return "Hello World";
-    }
-    
+//    @GetMapping("/posts")
+//    public String get() {
+//        return "Hello World";
+//    }
+
     // ✅ 컨트롤러 작성 후 테스트 작성
 
     // ✅ HTTP Method : GET, POST, PUT, PATCH, HEAD, OPTIONS, TRACE, CONNECT
@@ -47,42 +48,47 @@ public class PostController {
 
     // 📌 글 등록2 - 응답 값 변경
     @PostMapping("/posts")
-    public void post(@RequestBody @Valid PostCreate request){
+    public void post(@RequestBody @Valid PostCreate request) {
         // Case 1. 저장한 데이터 Entity -> Response로 응답하기
         // Case 2. 저장한 데이터의 Pk id -> Response로 응답하기
-                // 클라이언트에서는 응답받은 id를 조회 API를 통해 데이터를 응답 받음?
+        // 클라이언트에서는 응답받은 id를 조회 API를 통해 데이터를 응답 받음?
         // Case 3. 응답 필요 없음
-                // 클라이언트에서 모든 글 데이터 Context를 잘 관리함
+        // 클라이언트에서 모든 글 데이터 Context를 잘 관리함
         postService.write(request);
     }
-    
-    // 📌 글 조회 - 게시글 1개 조회
+
+    // 📌 글 조회 - 단건 조회
     @GetMapping("/posts/{postId}")
-    public PostResponse get(@PathVariable(name = "postId") Long id){
-        PostResponse postResponse = postService.get(id);
-        return postResponse;
+    public PostResponse get(@PathVariable(name = "postId") Long id) {
+        return postService.get(id);
 
         // 클라이언트에게 title이 10글자만 내려가도록 함
         // ✅ 서비스를 위한 응답 클래스를 분리 -> ResponseDTO
     }
 
+    //    @GetMapping("/posts/{postId}/rss")
+//    public Post getRss(@PathVariable(name = "postId") Long id){
+//        Post post = postService.getRss(id);
+//        return post;
+//    }
+//    // title의 전체를 요구 -> get()메서드와 정책이 충돌됨(?)
+
+    // 📌 글 조회 - 전체 조회
+    @GetMapping("/posts")
+    public List<PostResponse> getAll() {
+        return postService.getAll();
+    }
+
     // 📌 글 수정
     @PatchMapping("/posts/{postId}")
-    public void edit(@PathVariable Long postId, @RequestBody @Valid PostEdit request){
+    public void edit(@PathVariable Long postId, @RequestBody @Valid PostEdit request) {
         postService.edit(postId, request);
     }
 
     // 📌 글 삭제
     @DeleteMapping("/posts/{postsId}")
-    public void delete(@PathVariable Long postsId){
+    public void delete(@PathVariable Long postsId) {
         postService.delete(postsId);
-    }
-
-//    @GetMapping("/posts/{postId}/rss")
-//    public Post getRss(@PathVariable(name = "postId") Long id){
-//        Post post = postService.getRss(id);
-//        return post;
-        // title의 전체를 요구 -> get()메서드와 정책이 충돌됨(?)
     }
 
     // 📌 글 등록1 - POST Method
@@ -165,6 +171,8 @@ public class PostController {
 //    private String title;
 //    private String content;
 //}
+
+}   // PostController 끝
 
 /* 📌 @RequestParam과 @RequestBody
 * 글 등록1을 작성하고 Postman을 활용해 테스트를 해보려고 했는데 "405 Method Not Allowed" 에러 발생
