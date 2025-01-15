@@ -520,7 +520,105 @@ Spring Boot에서는 기본적으로
 
 ---
 # 15강 게시글 조회3 - 게시글 여러개 조회
+📂 `PostController.java`
+```java
+    @GetMapping("/posts")
+    public List<PostResponse> getAll() {
+        return postService.getAll();
+    }
+```
 
+📂 `PostService.java`
+```java
+    // 글 조회 메서드 - 전체 조회
+    public List<PostResponse> getAll(){
+        List<Post> posts = postRepository.findAll();
+
+        // Post를 PostResponse로 변환하는 작업이 필요
+        List<PostResponse> postResponses = posts.stream()
+                .map(post -> PostResponse.builder()
+                        .id(post.getId())
+                        .title(post.getTitle())
+                        .content(post.getContent())
+                        .build())
+                .toList();
+        return postResponses;
+    }
+```
+♻️ `PostService.java`
+- 반복적으로 작업하는 빌더 코드가 너무 많음
+- `PostResponse`에서 생성자 오버로딩을 통해 매개변수로 `Post`를 받음
+
+```java
+    public List<PostResponse> getAll(){
+        List<Post> posts = postRepository.findAll();
+
+        List<PostResponse> postResponses = posts.stream()
+                .map(post -> new PostResponse(post))
+                // .map(PostResponse::new)
+                .toList();
+        return postResponses;
+    }
+```
+📂 `PostResponse.java`
+```java
+@Getter
+public class PostResponse {
+    private Long id;
+    private String title;
+    private String content;
+
+    @Builder
+    public PostResponse(Long id, String title, String content) {
+        this.id = id;
+        // title이 10글자 이하일때 발생하는 에러를 방지하기 위해 Math.min()사용
+        this.title = title.substring(0, Math.min(title.length(), 10));
+        this.content = content;
+    }
+
+    // ♻️ 생성자 오버로딩 - 반복되는 빌더 코드를 줄이기 위함
+    public PostResponse(Post post){
+        this.id = post.getId();
+        this.title = post.getTitle();
+        this.content = post.getContent();
+    }
+}
+```
+## 테스트 코드에서 주목할만한 부분
+📂 `PostServiceTest.java`
+```java
+        // ♻️ 테스트 코드 리팩토링
+        postRepository.saveAll(List.of(
+                Post.builder()
+                        .title("의연 제목1")
+                        .content("의연 내용1")
+                        .build(),
+                Post.builder()
+                        .title("한얼 제목1")
+                        .content("한얼 제목2")
+                        .build()
+        ));
+```
+📂 `PostControllerTest.java`
+```java
+        // ♻️ 테스트 코드 리팩토링
+        Post post1 = postRepository.save(Post.builder()
+                .title("의연 제목1")
+                .content("의연 내용1")
+                .build());
+
+        Post post2 = postRepository.save(Post.builder()
+                .title("의연 제목2")
+                .content("의연 내용2")
+                .build());
+
+        ...
+                // 📌 검증 포인트 - json 응답 리스트의 길이, json 응답 객체의 값(title, content 등)
+                .andExpect(MockMvcResultMatchers.jsonPath("$.length()", Matchers.is(2)))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0].id").value(post1.getId()))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0].title").value(post1.getTitle()))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0].content").value(post1.getContent()))
+```
 ---
 # 16강 게시글 조회4 - 페이징 처리
 
@@ -972,6 +1070,24 @@ public PostEditorBuilder title(final String title) {
 
 ---
 # 20강 게시글 삭제
+📂`PostService.java`
+```java
+    public void delete(Long id){
+        // id로 게시글 조회
+        Post post = postRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 글입니다."));
+
+        postRepository.deleteById(id);
+        // 📍 또는 postRepository.delete(post);
+    }
+```
+📂`PostController.java`
+```java
+    @DeleteMapping("/posts/{postsId}")
+    public void delete(@PathVariable Long postsId) {
+        postService.delete(postsId);
+    }
+```
 
 ---
 # 21강 예외처리1
