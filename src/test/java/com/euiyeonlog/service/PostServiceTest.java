@@ -1,8 +1,10 @@
 package com.euiyeonlog.service;
 
 import com.euiyeonlog.domain.Post;
+import com.euiyeonlog.exception.PostNotFound;
 import com.euiyeonlog.request.PostCreate;
 import com.euiyeonlog.request.PostEdit;
+import com.euiyeonlog.request.PostSearch;
 import com.euiyeonlog.response.PostResponse;
 import com.euiyeonlog.respository.PostRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -10,8 +12,14 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Sort.Direction;
 
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -56,15 +64,15 @@ class PostServiceTest {
     @DisplayName("글 1개 조회")
     void test2(){
         // given
-        Post requestPost = Post.builder()
+        Post post = Post.builder()
                 .title("호돌맨 제목 테스트")
                 .content("호돌맨 내용 테스트")
                 .build();
 
-         postRepository.save(requestPost);
+         postRepository.save(post);
 
         // when
-        PostResponse postResponse = postService.get(requestPost.getId());
+        PostResponse postResponse = postService.get(post.getId());
 
         // then
         assertAll(
@@ -76,10 +84,36 @@ class PostServiceTest {
         );
     }
 
+    // 단건 조회 테스트 - 예외 처리
+    @Test
+    @DisplayName("글 1개 조회 - 존재하지 않는 글 조회")
+    void test3(){
+        // given
+        Post post = Post.builder()
+                .title("호돌맨 제목 테스트")
+                .content("호돌맨 내용 테스트")
+                .build();
+
+        postRepository.save(post);
+
+        // expected
+//        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> {
+//            postService.get(post.getId() + 1L);
+//        }, "예외처리가 잘못 되었어요!");
+
+        // 예외에 대한 메세지 검증도 필요
+//        assertEquals("존재하지 않는 글이지롱.", e.getMessage());
+//        assertEquals("존재하지 않는 글입니다.", e.getMessage());
+
+        // ♻️ 사용자 정의 예외로 테스트
+        assertThrows(PostNotFound.class, () -> postService.get(post.getId() + 1L));
+        assertThrows(IllegalArgumentException.class, () -> postService.get(post.getId() + 1L));
+    }
+
     // 전체 조회 테스트 -> 우선 글을 먼저 저장해주는 작업이 필요
     @Test
-    @DisplayName("글 1개 조회")
-    void test3(){
+    @DisplayName("글 전체 조회")
+    void test4(){
 //        List<Post> posts = new ArrayList<>();
 //
 //        // given
@@ -127,18 +161,104 @@ class PostServiceTest {
         ));
 
         // when
-        List<PostResponse> postResponses = postService.getAll();
+        // List<PostResponse> postResponses = postService.getAll();
 
         // then
-//        assertAll();
-        assertEquals(2, postResponses.size());
+        // assertEquals(2, postResponses.size());
+    }
 
+    // 글 전체 조회 테스트 - 페이징 처리
+    @Test
+    @DisplayName("글 전체 조회 - 페이징 처리, 1페이지 조회")
+    void test5(){
+        // 페이징 처리를 위해서는 ✅ SQL -> SELECT, LIMIT, OFFSET 모두 알아야 함!
+        // given
+        List<Post> requestPosts = IntStream.range(1, 31)    // for(int i=0;i<30;i++)와 같은 기능
+                .mapToObj(i -> {                        // mapToObj : Entity로 변환
+                    return Post.builder()
+                            .title("의연 제목 - " + i)
+                            .content("반포자이 - " + i)
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        postRepository.saveAll(requestPosts);
+
+        Pageable pageable = PageRequest.of(0, 5, Sort.by(Direction.DESC, "id"));
+
+
+        // when - getAll()에 페이지 번호를 입력하면 해당하는 페이지 게시글만 가져오도록 수정 필요
+        List<PostResponse> postResponses = postService.getAll(pageable);
+
+        // then
+        assertAll(
+                () -> assertEquals(5, postResponses.size()),
+                () -> assertEquals("의연 제목 - 30", postResponses.get(0).getTitle()),
+                () -> assertEquals("반포자이 - 30", postResponses.get(0).getContent())
+        );
+    }
+
+    // 글 조회 테스트 - QueryDSL
+    @Test
+    @DisplayName("글 전체 조회 - QueryDSL 사용, 1페이지 조회")
+    void test6(){
+        // given
+        List<Post> posts = IntStream.range(1, 21)
+                .mapToObj(i ->
+                    Post.builder()
+                            .title("의연 제목 - " + i)
+                            .content("의연 내용 - " + i)
+                            .build())
+                .toList();
+
+        postRepository.saveAll(posts);
+
+        Pageable pageable = PageRequest.of(0, 5);
+
+        // when
+        List<PostResponse> postResponses = postService.getAll(pageable);
+
+        // then
+        assertAll(
+                () -> assertEquals(5L, postResponses.size()),
+                () -> assertEquals("의연 제목 - 20", postResponses.get(0).getTitle())
+        );
+    }
+
+    // 글 조회 테스트 - PostSearch
+    @Test
+    @DisplayName("글 전체 조회 - QueryDSL 사용, PostSearch 사용")
+    void test7(){
+        // given
+        List<Post> posts = IntStream.range(1, 21)
+                .mapToObj(i ->
+                        Post.builder()
+                                .title("의연 제목 - " + i)
+                                .content("의연 내용 - " + i)
+                                .build())
+                .toList();
+
+        postRepository.saveAll(posts);
+
+        PostSearch postSearch = PostSearch.builder()
+                .page(1)
+                .pageSize(10)
+                .build();
+
+        // when
+        List<PostResponse> postResponses = postService.getAll(postSearch);
+
+        // then
+        assertAll(
+                () -> assertEquals(10L, postResponses.size()),
+                () -> assertEquals("의연 제목 - 20", postResponses.get(0).getTitle())
+        );
     }
 
     // 업데이트 테스트 - 제목 수정 테스트
     @Test
     @DisplayName("글 제목 수정")
-    void test4(){
+    void test8(){
         // given
         Post post = Post.builder()
                         .title("의연")
@@ -167,7 +287,7 @@ class PostServiceTest {
     // 업데이트 테스트 - 내용 수정 테스트
     @Test
     @DisplayName("글 내용 수정")
-    void test5(){
+    void test9(){
         // given
         Post post = Post.builder()
                 .title("의연")
@@ -223,11 +343,32 @@ class PostServiceTest {
         assertEquals("의연", changedPost.getTitle());
         assertEquals("반포자이", changedPost.getContent());
     }
+
+    @Test
+    @DisplayName("글 내용 수정 - 존재하지 않는 글 수정")
+    void test11(){
+        // given
+        Post post = Post.builder()
+                .title("의연")
+                .content("초가집")
+                .build();
+        postRepository.save(post);
+
+        // 수정할 데이터
+        PostEdit postEdit = PostEdit.builder()
+                .title(null)
+                .content("반포자이")
+                .build();
+
+        // expected
+        assertThrows(PostNotFound.class,
+                () -> postService.edit(post.getId() + 1L, postEdit));
+    }
     
     // 삭제 테스트
     @Test
     @DisplayName("게시글 삭제")
-    void test11(){
+    void test12(){
         // given - 게시글 등록
         Post post = Post.builder()
                 .title("의연 최고")
@@ -240,6 +381,20 @@ class PostServiceTest {
 
         //then - 레포지토리 게시글 개수 확인
         assertEquals(0, postRepository.count());
+    }
+    
+    @Test
+    @DisplayName("게시글 삭제 - 존재하지 않는 글 삭제")
+    void test13(){
+        // given
+        Post post = Post.builder()
+                .title("의연 삭제 제목")
+                .content("의연 삭제 내용")
+                .build();
+        postRepository.save(post);
 
+        // expected
+        assertThrows(PostNotFound.class,
+                () -> postService.delete(post.getId() + 1L));
     }
 }

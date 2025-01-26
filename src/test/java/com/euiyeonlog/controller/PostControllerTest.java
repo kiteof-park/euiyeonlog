@@ -17,6 +17,10 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
@@ -193,7 +197,7 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
     // 📌 글 1개 조회 테스트
     @Test
     @DisplayName("글 1개 조회")
-    void test4() throws Exception{
+    void test1() throws Exception{
         // given
         Post post = Post.builder()
                 .title("123456789012345")
@@ -219,7 +223,7 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
     // 📌 글 전체 조회 테스트
     @Test
     @DisplayName("글 전체조회")
-    void test9() throws Exception{
+    void test2() throws Exception{
         // given
 //        List<Post> posts = new ArrayList<>();
 //
@@ -293,15 +297,64 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
                 .andDo(MockMvcResultHandlers.print());
     }
 
+    // 📌 글 전체 조회 테스트 - 페이징 처리
+    @Test
+    @DisplayName("글 전체 조회 - 페이징 처리")
+    void test3() throws Exception{
+        // given
+        List<Post> requestPosts = IntStream.range(1, 31)     // 스트림에 정수 i가 하나씩 전달
+                // .mapToObj(i -> {...}) : i를 입력을 받아 동작 수행
+                // 각 요소(int)를 객체로 변환, Stream<Post>에 포함
+                .mapToObj(i -> Post.builder()
+                                .title("의연 미래 - " + i)
+                                .content("월 1000만원 - " + i)
+                                .build())
+                .collect(Collectors.toList());              // Post 객체를 리스트로 수집
+
+        postRepository.saveAll(requestPosts);
+        System.out.println(requestPosts);
+
+        // expected
+        mockMvc.perform(MockMvcRequestBuilders.get("/euiyeonlog/posts?page=1&sort=id,desc&size=5")
+                .contentType(APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.length()", Matchers.is(5)))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0].id").value(requestPosts.get(0).getId()))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0].title").value(requestPosts.get(0).getTitle()))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0].content").value(requestPosts.get(0).getTitle()))
+                .andDo(MockMvcResultHandlers.print());
+    }
+
+    @Test
+    @DisplayName("글 여러 개 조회 - PostSerach")
+    void test4() throws Exception{
+        // given
+        List<Post> posts = IntStream.range(1, 21)
+                .mapToObj(i -> Post.builder()
+                        .title("의연 제목 - " + i)
+                        .content("의연 내용 - " + i)
+                        .build())
+                .toList();
+
+        postRepository.saveAll(posts);
+
+        // expected
+        mockMvc.perform(MockMvcRequestBuilders.get("/euiyeonlog/posts?page=2&size=10")
+                        .contentType(APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.length()", Matchers.is(10)))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0].title").value("의연 제목 - 10"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0].content").value("의연 내용 - 10"))
+                .andDo(MockMvcResultHandlers.print());
+    }
+
+
     // 📌 글 내용 업데이트 테스트
     @Test
     @DisplayName("글 제목 수정")
-    void test7() throws Exception{
+    void test5() throws Exception{
         // given
-        Post post = Post.builder()
-                .title("의연")
-                .content("반포자이")
-                .build();
+        Post post = getPost("의연", "반포자이");
         postRepository.save(post);
 
         PostEdit postEdit = PostEdit.builder()
@@ -316,10 +369,17 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
                 .andDo(MockMvcResultHandlers.print());
     }
 
+    private Post getPost(String title, String content) {
+        return Post.builder()
+                .title(title)
+                .content(content)
+                .build();
+    }
+
     // 📌 게시글 삭제 테스트
     @Test
     @DisplayName("게시글 삭제")
-    void test8() throws Exception{
+    void test6() throws Exception{
         // given
         Post post = Post.builder()
                 .title("의연 짱짱")
@@ -331,6 +391,50 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
         mockMvc.perform(MockMvcRequestBuilders.delete("/euiyeonlog/posts/{postsId}", post.getId())
                 .contentType(APPLICATION_JSON))
                 .andExpect(MockMvcResultMatchers.status().isOk())
+                .andDo(MockMvcResultHandlers.print());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 게시글 조회")
+    void test7() throws Exception{
+
+        // expected
+        mockMvc.perform(MockMvcRequestBuilders.get("/euiyeonlog/posts/{postId}", 1L)
+                .contentType(APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.status().isNotFound())
+                .andDo(MockMvcResultHandlers.print());
+    }
+    
+    @Test
+    @DisplayName("존재하지 않는 게시글 수정")
+    void test8() throws Exception{
+        PostEdit postEdit = PostEdit.builder()
+                .title("의연")
+                .content("초가집")
+                .build();
+
+        // expected
+        mockMvc.perform(MockMvcRequestBuilders.patch("/euiyeonlog/posts/{postId}", 1L)
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(postEdit)))
+                .andExpect(MockMvcResultMatchers.status().isNotFound())
+                .andDo(MockMvcResultHandlers.print());
+    }
+    
+    @Test
+    @DisplayName("제목에 '바보'가 포함된 게시글 작성")
+    void test9() throws Exception{
+        PostCreate postCreate = PostCreate.builder()
+                .title("바보의연")
+                .content("천재의연")
+                .build();
+
+        String requestJson = objectMapper.writeValueAsString(postCreate);
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/euiyeonlog/posts")
+                        .contentType(APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(MockMvcResultMatchers.status().isBadRequest())
                 .andDo(MockMvcResultHandlers.print());
     }
 }
