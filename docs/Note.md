@@ -622,8 +622,195 @@ public class PostResponse {
 ---
 # 16강 게시글 조회4 - 페이징 처리
 
+### 게시글 전체 조회의 문제점
+- 게시글이 너무 많은 경우 💸**비용**💸이 너무 많이 든다.
+  - 비용 : 돈? 리소스?
+  - 게시글이 100,000,000개일 때 DB에 있는 게시글이 모두 조회하는 경우 DB가 뻗을 수 있다
+  - DB에서 애플리케이션 서버로 전달하는 시간, 데이터, 트래픽 비용(DB서버가 따로 있는 경우)
+
+### 결론
+- 페이징 처리를 해야 한다!
+- **요청한 페이지**에 대해서만 n개의 데이터를 들고와 `JSON`으로 응답한다.
+  - URL 경로에 페이지 번호(`page=1`)와 함께 요청된다
+
+### 페이징 처리 주의할 점
+📂 `PostService.java`
+```java
+public List<PostResponse> getAll(int page) {
+    Pageable pageable = PageRequest.of(page, 5);
+    
+    return postRepository.findAll(pageable).stream
+            .map(PostResponse::new)
+            .toList();
+}
+```
+- `page=1`을 요청하면 실제 응답으로는 1페이지가 아닌 2페이지의 결괄르 반환
+- page는 `0`부터 시작된다는걸 기억하라 ❗❗❗
+- 🪄sol. `yml`파일에서 설정 가능 
+
+### `one-indexed-parameters`
+-  Spring Data JPA에서 페이지 번호를 1부터 시작되도록 함(1을 기반으로 동작, One-Indexed)
+- 클라이언트가 `page=1`을 요청하면, 실제로 첫 번째 페이지를 반환 
+-`yml`파일 설정는 웹 요청으로부터 날라왔을 때 페이지를 1로 보정을 해주는 것
+
+```yml
+spring:
+  data:
+    web:
+      pageable:
+        one-indexed-parameters: true
+```
+---
+- `yml`파일 설정으로 인해 서비스 레이어에서 수동으로 `page`에 `1`을 넘겨주는 건 의미 ❌
+```java
+    // PostService
+    public List<PostResponse> getAll(int page){
+        Pageable pageable = PageRequest.of(page, 5, Sort.by(Sort.Direction.DESC, "id"));
+
+        return postRepository.findAll(pageable).stream()
+                .map(PostResponse::new)
+                .collect(Collectors.toList());
+    } 
+```
+- 직접 `PageRequest` 객체를 생성할 때 `page=1`을 넘겨주는건 의미가 없음
+- 실제로는 `PageRequest.of()`에 `0`으로 넣어줘야 됨
+- 웹 요청을 통한 페이징 처리가 필요
+--- 
+### @PageableDefault
+- `@PagebleDefault` :  웹 요청으로 페이징 관련 파라미터가 넘어왔을 때 페이징 보정 처리
+- Controller에서 `pageable`로 받으면 Service에서 `PageRequest.of`로 생성 ❌
+
+```java
+    // PostController
+    @GetMapping("/posts")
+    public List<PostResponse> getAll(@PageableDefault Pageable pageable) {
+        return postService.getAll(pageable);
+```
+
+### Sort
+- 응답값은 `id`값의 오름차순으로 정렬되어 있음 (기본 정렬)
+- 내림차순으로 정렬하고 싶은 경우 `Sort.by(Sort.Direction.DESC, "id")` 를 추가
+
+```java
+Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
+```
+
+### Page Size
+- 응답에 페이징 처리할 데이터의 크기(`page size`)의 기본값도 `yml`파일에서 설정 가능
+- `default-page-size: 5`
+```java
+spring:
+  data:
+    web:
+      pageable:
+        one-indexed-parameters: true
+        default-page-size: 5
+```
 ---
 # 17강 게시글 조회5 - 페이징 처리(QueryDSL)
+## QueryDSL
+📂 `build.gradle`에 의존성 추가 -> gradle -> other -> conmplieJava
+```java
+    // QueryDSL
+    implementation 'com.querydsl:querydsl-jpa:5.0.0:jakarta'
+    annotationProcessor "com.querydsl:querydsl-apt:5.0.0:jakarta"
+    annotationProcessor "jakarta.annotation:jakarta.annotation-api"
+    annotationProcessor "jakarta.persistence:jakarta.persistence-api"
+```
+📂 `build/generated/..`에 `QPost`생성
+
+
+---
+
+### 1. QueryDslConfig 클래스 작성
+- `QueryDSL`을 사용하기 위해서는 `JPAQueryFactory`가 필요
+- `JPAQueryFactory`는 자동 주입❌, 빈을 직접 생성해줘야 함
+- config 패키지 / QueryDslConfig 클래스 생성
+
+📂 `QueryDslConfig`
+```java
+@Configuration
+public class QueryDslConfig {
+
+    @PersistenceContext
+    public EntityManager em;
+
+    @Bean
+    public JPAQueryFactory jpaQueryFactory() {
+        return new JPAQueryFactory(em);
+    }
+}
+```
+
+### 2. PostRepositoryImpl 클래스 작성
+- JPA와 다르다 ..! 근데 뭐가 다른지 설명하기 어렵다 ..!
+- `PostRepositoryCustom` 인터페이스 작성
+```java
+public interface PostRepositoryCustom {
+
+    List<Post> getAll(int page);
+    List<Post> getAll(PostSearch postSearch);
+}
+```
+- `PostRepositoryImpl` 클래스 작성
+```java
+@RequiredArgsConstructor
+public class PostRepositoryImpl implements PostRepositoryCustom {
+
+    private final JPAQueryFactory jpaQueryFactory;
+
+    // 쿼리를 만드는 작업
+    @Override
+    public List<Post> getAll(int page) {
+        return jpaQueryFactory.selectFrom(QPost.post)
+                .limit(5)
+                .offset((long)(page-1)*10)
+                .orderBy(QPost.post.id.desc())
+                .fetch();
+    }
+
+    @Override
+    public List<Post> getAll(PostSearch postSearch) {
+        return jpaQueryFactory.selectFrom(QPost.post)
+                .limit(postSearch.getPageSize())
+                .offset((long)(postSearch.getPage()-1)*postSearch.getPageSize())
+                .orderBy(QPost.post.id.desc())
+                .fetch();
+    }
+}
+```
+- `PostRepository`를 대상으로 쿼리를 날리는 것이기 때문에,   
+`PostRepository`에 `PostRepositoryCustom`을 추가
+  - `PostRepositoryImpl`의 기능들이 주입됨
+```java
+public interface PostRepository extends JpaRepository<Post, Long>, PostRepositoryCustom {
+}
+```
+
+### 3. PostSearch 
+- 페이징 처리만 할 때는 `Pageable`만 받으면 되지만 정렬, 검색 옵션이 추가된다면 ?
+- `PostSearch`와 같은 request class를 정의해서 사용 
+
+📂 `PostSearch`
+```java
+@Getter
+@Setter
+@Builder
+public class PostSearch {
+
+    private static final int MAX_SIZE = 2000;
+
+    @Builder.Default
+    private Integer page = 1;
+
+    @Builder.Default
+    private Integer pageSize = 10;
+
+    public long getOffset() {
+        return (long) (max(1, page) - 1) * min(pageSize, MAX_SIZE);
+    }
+}
+```
 
 ---
 # 18강 게시글 수정
@@ -1090,8 +1277,263 @@ public PostEditorBuilder title(final String title) {
 ```
 
 ---
-# 21강 예외처리1
+# 21강 예외처리1 - 서비스 테스트
 
+## assertThrows()
+- 특징 코드를 실행했을 때, 예외가 발생하는지 검증하는데 사용
+- 테스트 대상 코드에서 **예상된 예외가 발생하면 테스트 성공✅**
+  - `assertThrows`는 발생한 예외 객체를 반환 -> 추가적으로 예외 메세지나 특정 속성 검증
+  - 예외 객체의 메세지를 통해 발생 이유를 구체적으로 검증
+- 예상된 예외가 발생하지 않거나 다른 예외가 발생하면 테스트 실패❌
+
+```java
+static <T extends Throwable> T assertThrows(
+        Class<T> expectedType, 
+        Executable executable,
+        String message
+)
+```
+- `Class<T> expectedType` : 테스트에서 기대하는 예외 클래스 타입
+- `Executable executalbe` : 예외가 발생할 가능성이 있는 코드, 람다 표현식 또는 익명 클래스로 전달
+- `String message` : 테스트 실패 시 출력할 커스텀 메세지
+
+📂`PostServiceTest.java`
+```java
+    @Test
+    @DisplayName("글 1개 조회")
+    void test3(){
+        // given
+        Post post = Post.builder()
+                .title("호돌맨 제목 테스트")
+                .content("호돌맨 내용 테스트")
+                .build();
+
+        postRepository.save(post);
+
+        // expected
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> {
+            postService.get(post.getId() + 1L);
+        }, "예외처리가 잘못 되었어요!");
+
+        // 예외에 대한 메세지 검증도 필요
+        // assertEquals("존재하지 않는 글이지롱.", e.getMessage());
+        assertEquals("존재하지 않는 글입니다.", e.getMessage());
+    }
+```
+## 사용자 정의 예외의 필요성
+- `IllegalArgumentException`은 게시글 조회에서만 발생할 수 있는 예외❌ 
+  - `IllegalArgumentException`은 자바에서 제공하는 예외, 다른 곳에서도 충분히 발생할 수 있음
+  - 자바에서 정의한 예외로, 비지니스를 명확하게 표현❌
+- 그래서 테스트 코드를 작성할 때마다 매번 Exception의 메세지를 검증하는 코드를 작성해야 함
+  - "존재하지 않는 글입니다."
+- 그런데 만약 오류 메세지가 변경된다면? 테스트 코드에서도 오류 메세지를 다 바꿔줘야 함
+
+📂`PostNotFound.java`
+```java
+public class PostNotFound extends RuntimeException {
+
+    private static final String MESSAGE = "존재하지 않는 글입니다.";
+
+    public PostNotFound() {
+        super(MESSAGE);
+    }
+
+    public PostNotFound(Throwable cause) {
+        super(MESSAGE, cause);
+    }
+}
+```
 ---
-# 22강 예외처리2
+# 22강 예외처리2 - 컨트롤러 테스트
+- 존재하지 않는 게시글 조회를 하면 500 error가 발생하고,
+아무런 데이터가 내려오지 않음
+- `PostNotFound` Exception을 정의했을 뿐, 어떤 HttpStatus로 에러를 발생시킬지는 정의❌
 
+📂`PostController.java`
+```java
+    @GetMapping("/posts/{postId}")
+    public PostResponse get(@PathVariable(name = "postId") Long id) {
+        return postService.get(id);
+    }
+```
+
+📂`PostService.java`
+```java
+    public PostResponse get(Long id){
+        Post post = postRepository.findById(id)
+                .orElseThrow(() -> new PostNotFound());
+        
+        PostResponse response = PostResponse.builder()
+                .id(post.getId())
+                .title(post.getTitle())
+                .content(post.getContent())
+                .build();
+        return response;
+    }
+```
+### ExceptionController
+- 기존의 `ExceptionController.java`는 `MethodArgumentNotValidException`에 대해서만  
+캐치를 하고 `JSON`으로 만들어서 응답
+```java
+@Slf4j
+@ControllerAdvice
+public class ExceptionController {
+
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    @ResponseBody   // ControllerAdvice에 ReponseBody가 없으면 메서드 반환값인 Map<String, String>이 View이름으로 해석
+    public ErrorResposne invalidRequestHandler(MethodArgumentNotValidException e){
+        ErrorResposne response = ErrorResposne.builder()
+                .code("400")
+                .message("잘못된 요청입니다.")
+                .build();
+
+        for(FieldError fieldError : e.getFieldErrors()){
+            response.addValidation(fieldError.getField(), fieldError.getDefaultMessage());
+        }
+        return response;
+    }
+}
+```
+- `ExceptionController`에 `PostNotFound`에 대한 핸들러 메서드를 정의
+
+📂`ExceptionController.java`
+```java
+    @ResponseBody
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    @ExceptionHandler(PostNotFound.class)
+    public ErrorResposne postNotFoundHandler(PostNotFound e) {
+
+        ErrorResposne errorResposne = ErrorResposne.builder()
+                .code("404")
+                .message(e.getMessage())
+                .build();
+
+        return errorResposne;
+    }
+```
+- `PostControllerTest`에서 예외가 발생했을 때 JSON 응답값을 내려주는지 확인
+```text
+MockHttpServletResponse:
+           Status = 404
+    Error message = null
+          Headers = [Content-Type:"application/json"]
+     Content type = application/json
+             Body = {"code":"404","message":"존재하지 않는 글입니다.","validation":{}}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+```
+- `validation` 필드는 비어있음 `{}`
+- 비어있지 않은 필드에 대해서만 JSON 응답값을 내려주기 위해 `@JsonInclude` 사용
+  - `@JsonInclude(JsonInclude.Include.NON_EMPTY)`  
+  - `null` 이나 비어있는 값을 제외하고 응답값을 반환
+
+📂`ErrorResponse.java`
+```java
+@Getter
+@Builder
+@RequiredArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_EMPTY)
+public class ErrorResposne {
+    private final String code;
+    private final String message;
+    private final Map<String, String> validation = new HashMap<>();
+
+    public void addValidation(String fieldName, String errorMessage){
+        this.validation.put(fieldName, errorMessage);
+    }
+}
+```
+## 사용자 정의 예외와 ExceptionController _- @ControllerAdvice_
+- 애플리케이션이 커질수록 사용자 정의 예외와, 그 예외를 처리하는 `ExceptionHandler`는 무한 증식!
+- 어떻게 할래?
+
+### 1. 애플리케이션 비지니스에 맞는 최상위 Exception 정의
+📂`EuiyeonlogException.java`
+
+```java
+public abstract class EuiyeonlogException extends RuntimeException {
+
+    public EuiyeonlogException(String message) {
+        super(message);
+    }
+
+    public EuiyeonlogException(String message, Throwable cause) {
+        super(message, cause);
+    }
+}
+```
+### 2. 비지니스에서 발생하는 Exception들이 최상위 Exception을 상속받도록 정의
+📂`PostNotFound.java`
+```java
+public class PostNotFound extends EuiyeonlogException {
+    ...
+}
+
+```
+📂`InvalidRequest.java`
+```java
+public class InvalidRequest extends EuiyeonlogException {
+    ...
+}
+```
+### 3. 그런데 Exception마다 다른 Status Code는 다르다..! 어떡할래?
+- 최상위 Exception에 코드를 반환하는 추상메서드 정의
+- 하위 Exception에서 자신의 Exception에 맞는 코드를 반환하도록 오버라이딩
+
+📂`EuiyeonlogException.java`
+```java
+public abstract class EuiyeonlogException extends RuntimeException {
+
+    public EuiyeonlogException(String message) {
+        super(message);
+    }
+
+    public EuiyeonlogException(String message, Throwable cause) {
+        super(message, cause);
+    }
+
+    public abstract int statusCode();
+}
+```
+
+📂`InvalidRequest.java`
+```java
+    @Override
+    public int getStatusCode() {
+        return 400;
+    }
+```
+
+
+📂`PostNotFound.java`
+```java
+    @Override
+    public int getStatusCode() {
+        return 404;
+    }
+```
+
+### ResponseEntity
+
+📂`ExceptionController.java`
+- `ExceptionController`에서는 Execption마다 고정으로 사용하던 `@ResponseStatus`를 제거
+- `ResponseEntity`를 사용해 Status Code를 반환
+
+```java
+    @ResponseBody
+    @ExceptionHandler(EuiyeonlogException.class)
+    public ResponseEntity<ErrorResposne> euiyeonlogException(EuiyeonlogException e) {
+
+        int statusCode = e.getStatusCode();
+
+        ErrorResposne errorResposne = ErrorResposne.builder()
+                .code(String.valueOf(statusCode))
+                .message(e.getMessage())
+                .build();
+
+        return ResponseEntity.status(statusCode).body(errorResposne);
+    }
+
+```
