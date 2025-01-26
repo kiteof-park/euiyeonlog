@@ -1,8 +1,11 @@
 package com.euiyeonlog.controller;
 
+import com.euiyeonlog.exception.InvalidRequest;
 import com.euiyeonlog.request.PostCreate;
 import com.euiyeonlog.request.PostEdit;
+import com.euiyeonlog.request.PostSearch;
 import com.euiyeonlog.response.PostResponse;
+import com.euiyeonlog.respository.PostRepository;
 import com.euiyeonlog.service.PostService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +23,7 @@ import java.util.List;
 @RequestMapping("/euiyeonlog")
 public class PostController {
     private final PostService postService;
+    private final PostRepository postRepository;
     // SSR -> JSP, Thymeleaf, Mustache, Freemarker
     // SPA ->
     // Vue -> Vue + SSR = nuxt.js
@@ -54,6 +58,10 @@ public class PostController {
         // 클라이언트에서는 응답받은 id를 조회 API를 통해 데이터를 응답 받음?
         // Case 3. 응답 필요 없음
         // 클라이언트에서 모든 글 데이터 Context를 잘 관리함
+
+        if(request.getTitle().contains("바보")){
+            throw new InvalidRequest();
+        }
         postService.write(request);
     }
 
@@ -73,10 +81,33 @@ public class PostController {
 //    }
 //    // title의 전체를 요구 -> get()메서드와 정책이 충돌됨(?)
 
-    // 📌 글 조회 - 전체 조회
+//    // 📌 글 조회 - 전체 조회
+//    @GetMapping("/posts")
+//    public List<PostResponse> getAll() {
+//        return postService.getAll();
+//    }
+
+    // 📌 글 전체 조회 - 페이징 처리1
+//    @GetMapping("/posts")
+//    public List<PostResponse> getAll(@RequestParam int page) {
+//            return postService.getAll(page);
+//}
+
+    // ♻️ 글 전체 조회 - 페이징 처리2
+    // @PagebleDefault :  웹 요청으로 페이징 관련 파라미터가 넘어왔을 때 페이징 보정 처리, default size = 10
+    // 요청으로 page = 1이 들어오면, 0으로 보정해줌 아마도?
+    // @PageableDefault를 제거하고 yml파일에서 설정 가능 - one-indexed-parameters: true, default-page-size: 5
+    // 또는 @PageableDefault(size = 5)
+//    @GetMapping("/posts")
+//    public List<PostResponse> getAll(Pageable pageable) {
+//        return postService.getAll(pageable);
+//    }
+
+    // 📌 글 전체 조회 - QueryDSL 페이징 처리
+    // 📌 Pageable을 받지 않고, PostSearch 클래스를 별도로 정의해서 사용
     @GetMapping("/posts")
-    public List<PostResponse> getAll() {
-        return postService.getAll();
+    public List<PostResponse> getAll(@ModelAttribute PostSearch postSearch) {
+        return postService.getAll(postSearch);
     }
 
     // 📌 글 수정

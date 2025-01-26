@@ -2,12 +2,15 @@ package com.euiyeonlog.service;
 
 import com.euiyeonlog.domain.Post;
 import com.euiyeonlog.domain.PostEditor;
+import com.euiyeonlog.exception.PostNotFound;
 import com.euiyeonlog.request.PostCreate;
 import com.euiyeonlog.request.PostEdit;
+import com.euiyeonlog.request.PostSearch;
 import com.euiyeonlog.response.PostResponse;
 import com.euiyeonlog.respository.PostRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,7 +58,7 @@ public class PostService {
 //        }
 
         Post post = postRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 글입니다."));
+                .orElseThrow(PostNotFound::new);
 
         // 📌 조회해온 엔티티를 변환 -> 이 변환 작업을 서비스 레이어에서 하는게 맞을까?
         /* 서비스 레이어를 웹 서비스, 서비스로 나눠서 생각해보기
@@ -90,14 +93,46 @@ public class PostService {
     // ♻️ [리팩토링] 글 조회 메서드 - 전체조회
     // 반복적으로 작업하는 빌더 코드가 너무 많음
     // PostReponse에서 생성자 오버로딩을 통해 매개변수로 Post를 받음
-    public List<PostResponse> getAll(){
-        List<Post> posts = postRepository.findAll();
+//    public List<PostResponse> getAll(){
+//        List<Post> posts = postRepository.findAll();
+//
+//        List<PostResponse> postResponses = posts.stream()
+//                .map(post -> new PostResponse(post))
+//                // .map(PostResponse::new)
+//                .toList();
+//        return postResponses;
+//    }
 
-        List<PostResponse> postResponses = posts.stream()
-                .map(post -> new PostResponse(post))
-                // .map(PostResponse::new)
+    // ♻️ [페이징 처리][리팩토링1] 글 조회 메서드 - 전체조회
+//    public List<PostResponse> getAll(int page){
+//        Pageable pageable = PageRequest.of(page, 5, Sort.by(Sort.Direction.DESC, "id"));
+//
+//        return postRepository.findAll(pageable).stream()
+//                .map(PostResponse::new)
+//                .collect(Collectors.toList());
+//    }
+
+    // ♻️ [페이징 처리][리팩토링2] 글 조회 메서드 - 전체조회
+//    public List<PostResponse> getAll(Pageable pageable){
+//        return  postRepository.findAll(pageable).stream()
+//                .map(PostResponse::new)
+//                .collect(Collectors.toList());
+//    }
+
+    // 📌 [페이징 처리][QueryDSL] 글 조회 - 전체 조회
+    public List<PostResponse> getAll(Pageable pageable){
+        // postRepository.getAll(pageable.getPageNumber()) 도 가능
+            // 정렬, 검색 옵션이 추가된다면? -> PostSearch라는 request class를 정의
+        return postRepository.getAll(1).stream()
+                .map(PostResponse::new)
                 .toList();
-        return postResponses;
+    }
+
+    // 📌 [페이징 처리][PostSearch] 글 조회 - 전체 조회
+    public List<PostResponse> getAll(PostSearch postSearch){
+        return postRepository.getAll(postSearch).stream()
+                .map(PostResponse::new)
+                .toList();
     }
 
 
@@ -112,7 +147,7 @@ public class PostService {
     public void edit(Long id, PostEdit postEdit){
         // id를 통해 게시글 하나 가져오기
         Post post = postRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 글입니다."));
+                .orElseThrow(() -> new PostNotFound());
 
         // 1. 제목, 내용 변경 -> ❌엔티티에 @Setter달아서 수정하기? 지양!!❌
 //        post.setTitle(postEdit.getTitle());
@@ -152,7 +187,7 @@ public class PostService {
     public void delete(Long id){
         // id로 게시글 조회
         Post post = postRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 글입니다."));
+                .orElseThrow(() -> new PostNotFound());
 
         postRepository.deleteById(id);
         // 또는
