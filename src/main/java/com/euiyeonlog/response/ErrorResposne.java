@@ -1,10 +1,10 @@
 package com.euiyeonlog.response;
 
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import lombok.Setter;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -29,8 +29,9 @@ import java.util.Map;
  * */
 
 @Getter
-@RequiredArgsConstructor
 @Builder
+@RequiredArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_EMPTY)
 public class ErrorResposne {
     private final String code;
     private final String message;
